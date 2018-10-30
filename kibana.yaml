@@ -1,0 +1,28 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: elkstack
+  labels:
+    component: kibana
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+     component: kibana
+  template:
+    metadata:
+      labels:
+        component: kibana
+    spec:
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:6.4.0
+        env:
+        - name: cluster.name
+          value: myesdb
+        - name: ELASTICSEARCH_URL
+          value: "http://elasticsearch-ingest-svc:9200"
+        ports:
+        - containerPort: 5601
+          name: http

@@ -1,0 +1,72 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: es-ingest
+  namespace: elkstack
+  labels:
+    component: elasticsearch
+    role: ingest 
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        component: elasticsearch
+        role: ingest 
+    spec:
+      initContainers:
+      - name: init-sysctl
+        image: busybox:1.27.2
+        command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+        securityContext:
+          privileged: true
+      containers:
+      - name: es-ingest
+        image: docker.elastic.co/elasticsearch/elasticsearch:6.4.0
+        env:
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: cluster.name
+          value: myesdb
+        - name: network.host
+          value: _site_,_local_
+        - name: discovery.zen.ping.unicast.hosts
+          value: "elasticsearch-master-svc"
+        - name: node.master
+          value: "false"
+        - name: node.ingest
+          value: "true"
+        - name: node.data
+          value: "false"
+        - name: http.enabled
+          value: "true" 
+        - name: ES_JAVA_OPTS
+          value: -Xms512m -Xmx512m
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        livenessProbe:
+          tcpSocket:
+            port: transport
+          initialDelaySeconds: 70
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: http
+          initialDelaySeconds: 80
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: storage
+          mountPath: /usr/share/elasticsearch/data
+      volumes:
+          - emptyDir:
+              medium: ""
+            name: "storage"

@@ -1,0 +1,66 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: es-master
+  namespace: elkstack
+  labels:
+    component: elasticsearch
+    role: master
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        component: elasticsearch
+        role: master
+    spec:
+      initContainers:
+      - name: init-sysctl
+        image: busybox:1.27.2
+        command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+        securityContext:
+          privileged: true
+      containers:
+      - name: es-master
+        image: docker.elastic.co/elasticsearch/elasticsearch:6.4.0
+        env:
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: cluster.name
+          value: myesdb
+        - name: network.host
+          value: _site_
+        - name: discovery.zen.minimum_master_nodes
+          value: "2"
+        - name: discovery.zen.ping.unicast.hosts
+          value: "elasticsearch-master-svc"
+        - name: node.master
+          value: "true"
+        - name: node.ingest
+          value: "false"
+        - name: node.data
+          value: "false"
+        - name: http.enabled
+          value: "true" 
+        - name: ES_JAVA_OPTS
+          value: -Xms256m -Xmx256m
+        ports:
+        - containerPort: 9300
+          name: transport
+        livenessProbe:
+          tcpSocket:
+            port: transport
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        volumeMounts:
+        - name: storage
+          mountPath: /usr/share/elasticsearch/data
+      volumes:
+          - emptyDir:
+              medium: ""
+            name: "storage"
